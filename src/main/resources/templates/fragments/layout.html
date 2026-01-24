@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!-- Common Head Fragment -->
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${title}">Guardian Monitor</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/5.3.2/css/bootstrap.min.css}">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap-icons/1.11.2/font/bootstrap-icons.css}">
+
+    <style>
+        :root {
+            --heronix-primary: #2c5aa0;
+            --heronix-secondary: #1a3a6e;
+            --heronix-accent: #4a90d9;
+            --heronix-success: #28a745;
+            --heronix-warning: #ffc107;
+            --heronix-danger: #dc3545;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar-heronix {
+            background: linear-gradient(135deg, var(--heronix-primary) 0%, var(--heronix-secondary) 100%);
+        }
+
+        .sidebar {
+            min-height: calc(100vh - 56px);
+            background-color: #fff;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+
+        .sidebar .nav-link {
+            color: #333;
+            padding: 0.75rem 1rem;
+            border-radius: 0.25rem;
+            margin: 0.25rem 0.5rem;
+        }
+
+        .sidebar .nav-link:hover {
+            background-color: #e9ecef;
+        }
+
+        .sidebar .nav-link.active {
+            background-color: var(--heronix-primary);
+            color: white;
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 0.5rem;
+            width: 20px;
+        }
+
+        .stat-card {
+            border-radius: 10px;
+            border: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stat-card .stat-icon {
+            font-size: 2rem;
+            opacity: 0.8;
+        }
+
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .stat-card .stat-label {
+            color: #6c757d;
+            font-size: 0.875rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-pending { background-color: #fff3cd; color: #856404; }
+        .status-approved { background-color: #d4edda; color: #155724; }
+        .status-transmitted { background-color: #cce5ff; color: #004085; }
+        .status-denied { background-color: #f8d7da; color: #721c24; }
+        .status-failed { background-color: #f5c6cb; color: #721c24; }
+
+        .vendor-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .vendor-canvas { background-color: #e74c3c; color: white; }
+        .vendor-google_classroom { background-color: #4285f4; color: white; }
+
+        .token-card {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .token-value {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: var(--heronix-primary);
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: #e9ecef;
+        }
+
+        .page-header {
+            border-bottom: 2px solid var(--heronix-primary);
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .alert-count {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: var(--heronix-danger);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<!-- Navigation Bar Fragment -->
+<nav th:fragment="navbar" class="navbar navbar-expand-lg navbar-dark navbar-heronix">
+    <div class="container-fluid">
+        <a class="navbar-brand d-flex align-items-center" th:href="@{/monitor}">
+            <i class="bi bi-shield-check me-2"></i>
+            <span>Guardian Monitor</span>
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/monitor/requests/pending}">
+                        <i class="bi bi-bell"></i>
+                        <span th:if="${pendingCount != null and pendingCount > 0}"
+                              class="badge bg-danger" th:text="${pendingCount}"></span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/swagger-ui.html}">
+                        <i class="bi bi-code-slash"></i> API
+                    </a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+                        <i class="bi bi-person-circle"></i> IT Staff
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" th:href="@{/logout}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Sidebar Fragment -->
+<div th:fragment="sidebar" class="sidebar p-3">
+    <nav class="nav flex-column">
+        <a class="nav-link" th:classappend="${#strings.contains(#httpServletRequest.requestURI, '/dashboard') or #httpServletRequest.requestURI == '/monitor' or #httpServletRequest.requestURI == '/monitor/'} ? 'active' : ''"
+           th:href="@{/monitor/dashboard}">
+            <i class="bi bi-speedometer2"></i> Dashboard
+        </a>
+        <a class="nav-link" th:classappend="${#strings.contains(#httpServletRequest.requestURI, '/requests') and !#strings.contains(#httpServletRequest.requestURI, '/pending')} ? 'active' : ''"
+           th:href="@{/monitor/requests}">
+            <i class="bi bi-list-ul"></i> All Requests
+        </a>
+        <a class="nav-link position-relative" th:classappend="${#strings.contains(#httpServletRequest.requestURI, '/pending')} ? 'active' : ''"
+           th:href="@{/monitor/requests/pending}">
+            <i class="bi bi-hourglass-split"></i> Pending Approvals
+        </a>
+
+        <hr>
+
+        <h6 class="text-muted px-3 mt-2 mb-2">
+            <small>VENDORS</small>
+        </h6>
+        <a class="nav-link" th:href="@{/monitor/requests(vendor='CANVAS')}">
+            <i class="bi bi-book"></i> Canvas
+        </a>
+        <a class="nav-link" th:href="@{/monitor/requests(vendor='GOOGLE_CLASSROOM')}">
+            <i class="bi bi-google"></i> Google Classroom
+        </a>
+
+        <hr>
+
+        <a class="nav-link" th:classappend="${#strings.contains(#httpServletRequest.requestURI, '/export')} ? 'active' : ''"
+           th:href="@{/monitor/export}">
+            <i class="bi bi-download"></i> Export Data
+        </a>
+    </nav>
+</div>
+
+<!-- Scripts Fragment -->
+<div th:fragment="scripts">
+    <script th:src="@{/webjars/bootstrap/5.3.2/js/bootstrap.bundle.min.js}"></script>
+</div>
+
+</html>
