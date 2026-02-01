@@ -46,10 +46,12 @@ public class GoogleApiClient {
      * Get user info for connection testing.
      */
     public UserInfo getUserInfo(VendorCredential credential) {
-        WebClient client = createClient(credential);
-
         try {
             String token = decryptionService.decrypt(credential.getEncryptedOauthToken());
+            if (token == null || token.isBlank()) {
+                throw new IllegalStateException("OAuth token is missing for credential: " + credential.getConnectionName());
+            }
+
             Map<String, Object> response = WebClient.builder()
                     .baseUrl(USERINFO_URL)
                     .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
