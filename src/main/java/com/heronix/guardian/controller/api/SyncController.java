@@ -1,6 +1,7 @@
 package com.heronix.guardian.controller.api;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import org.springframework.http.ResponseEntity;
@@ -49,7 +50,7 @@ public class SyncController {
                 syncService.pushStudentsAsync(vendorId, students);
 
         // Return immediately with job ID
-        String jobId = "job_" + System.currentTimeMillis();
+        String jobId = UUID.randomUUID().toString();
         return ResponseEntity.accepted().body(new SyncJobResponse(
                 jobId, "STARTED", "Student sync job started", students.size(), 0));
     }
@@ -66,7 +67,7 @@ public class SyncController {
         CompletableFuture<SyncOrchestrationService.SyncJobResult> future =
                 syncService.pushCoursesAsync(vendorId, courses);
 
-        String jobId = "job_" + System.currentTimeMillis();
+        String jobId = UUID.randomUUID().toString();
         return ResponseEntity.accepted().body(new SyncJobResponse(
                 jobId, "STARTED", "Course sync job started", courses.size(), 0));
     }
@@ -87,7 +88,7 @@ public class SyncController {
         CompletableFuture<SyncOrchestrationService.SyncJobResult> future =
                 syncService.pushEnrollmentsAsync(vendorId, pairs);
 
-        String jobId = "job_" + System.currentTimeMillis();
+        String jobId = UUID.randomUUID().toString();
         return ResponseEntity.accepted().body(new SyncJobResponse(
                 jobId, "STARTED", "Enrollment sync job started", enrollments.size(), 0));
     }
@@ -124,7 +125,7 @@ public class SyncController {
         CompletableFuture<SyncOrchestrationService.SyncJobResult> future =
                 syncService.fullSyncAsync(vendorId, request.students, request.courses, pairs);
 
-        String jobId = "job_" + System.currentTimeMillis();
+        String jobId = UUID.randomUUID().toString();
         int totalRecords = (request.students != null ? request.students.size() : 0) +
                            (request.courses != null ? request.courses.size() : 0) +
                            (request.enrollments != null ? request.enrollments.size() : 0);

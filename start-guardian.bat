@@ -29,10 +29,16 @@ if %jver% LSS 21 (
 )
 
 REM Set environment variables (override these as needed)
-if not defined GUARDIAN_MASTER_KEY set GUARDIAN_MASTER_KEY=defaultDevKeyMustBeAtLeast32Chars!
+if not defined GUARDIAN_MASTER_KEY (
+    echo [ERROR] GUARDIAN_MASTER_KEY environment variable is not set.
+    echo Please set a 32+ character encryption key before starting Guardian.
+    echo Example: set GUARDIAN_MASTER_KEY=YourSecureKeyHereMustBe32CharsLong
+    pause
+    exit /b 1
+)
 if not defined SIS_API_URL set SIS_API_URL=http://localhost:9580
 
-echo [INFO] Starting Heronix Guardian on port 9680...
+echo [INFO] Starting Heronix Guardian on port 9989...
 echo [INFO] SIS API URL: %SIS_API_URL%
 echo.
 

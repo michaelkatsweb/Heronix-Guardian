@@ -1,5 +1,6 @@
 package com.heronix.guardian.adapter.google;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -16,6 +17,7 @@ import com.heronix.guardian.config.GuardianProperties;
 import com.heronix.guardian.model.domain.VendorCredential;
 import com.heronix.guardian.model.dto.InboundGradeDTO;
 import com.heronix.guardian.model.dto.TokenizedCourseDTO;
+import com.heronix.guardian.service.CredentialDecryptionService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,9 @@ public class GoogleApiClient {
 
     private final WebClient.Builder webClientBuilder;
     private final GuardianProperties properties;
+    private final CredentialDecryptionService decryptionService;
+
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     private static final String CLASSROOM_API_BASE = "https://classroom.googleapis.com";
     private static final String OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -44,14 +49,15 @@ public class GoogleApiClient {
         WebClient client = createClient(credential);
 
         try {
+            String token = decryptionService.decrypt(credential.getEncryptedOauthToken());
             Map<String, Object> response = WebClient.builder()
                     .baseUrl(USERINFO_URL)
-                    .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + credential.getEncryptedOauthToken())
+                    .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                     .build()
                     .get()
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (response != null) {
                 return new UserInfo(
@@ -92,7 +98,7 @@ public class GoogleApiClient {
                     .retrieve()
                     .bodyToMono(Map.class)
                     .onErrorReturn(Map.of())
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (existingCourse != null && existingCourse.containsKey("id")) {
                 // Update existing course
@@ -102,7 +108,7 @@ public class GoogleApiClient {
                         .bodyValue(courseData)
                         .retrieve()
                         .bodyToMono(Void.class)
-                        .block();
+                        .block(REQUEST_TIMEOUT);
             } else {
                 // Create new course
                 log.debug("Creating new Google Classroom course: {}", course.getToken());
@@ -111,7 +117,7 @@ public class GoogleApiClient {
                         .bodyValue(courseData)
                         .retrieve()
                         .bodyToMono(Map.class)
-                        .block();
+                        .block(REQUEST_TIMEOUT);
 
                 // Create alias for future lookups
                 if (response != null && response.containsKey("id")) {
@@ -135,7 +141,7 @@ public class GoogleApiClient {
                     .bodyValue(Map.of("alias", "p:" + alias))
                     .retrieve()
                     .bodyToMono(Void.class)
-                    .block();
+                    .block(REQUEST_TIMEOUT);
         } catch (Exception e) {
             log.warn("Failed to create course alias: {}", e.getMessage());
         }
@@ -161,7 +167,7 @@ public class GoogleApiClient {
                     .bodyValue(studentData)
                     .retrieve()
                     .bodyToMono(Void.class)
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             log.debug("Added student {} to Google course {}", studentToken, courseToken);
 
@@ -188,7 +194,7 @@ public class GoogleApiClient {
                     .bodyToMono(Map.class)
                     .map(response -> (List<Map<String, Object>>) response.get("courseWork"))
                     .onErrorReturn(List.of())
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (coursework == null) coursework = List.of();
 
@@ -204,7 +210,7 @@ public class GoogleApiClient {
                         .bodyToMono(Map.class)
                         .map(response -> (List<Map<String, Object>>) response.get("studentSubmissions"))
                         .onErrorReturn(List.of())
-                        .block();
+                        .block(REQUEST_TIMEOUT);
 
                 if (submissions == null) continue;
 
@@ -248,6 +254,13 @@ public class GoogleApiClient {
      * Refresh OAuth token.
      */
     public TokenRefreshResult refreshToken(VendorCredential credential) {
+        String clientSecret = decryptionService.decrypt(credential.getEncryptedClientSecret());
+        String refreshToken = decryptionService.decrypt(credential.getEncryptedRefreshToken());
+
+        if (clientSecret == null || refreshToken == null) {
+            throw new IllegalStateException("OAuth client_secret or refresh_token is missing for credential: " + credential.getConnectionName());
+        }
+
         try {
             Map<String, Object> response = WebClient.builder()
                     .baseUrl(OAUTH_TOKEN_URL)
@@ -257,25 +270,27 @@ public class GoogleApiClient {
                     .bodyValue(Map.of(
                             "grant_type", "refresh_token",
                             "client_id", credential.getClientId(),
-                            "client_secret", credential.getEncryptedClientSecret(),
-                            "refresh_token", credential.getEncryptedRefreshToken()
+                            "client_secret", clientSecret,
+                            "refresh_token", refreshToken
                     ))
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (response != null) {
                 String accessToken = (String) response.get("access_token");
-                String refreshToken = (String) response.get("refresh_token");
+                String newRefreshToken = (String) response.get("refresh_token");
                 Integer expiresIn = (Integer) response.get("expires_in");
 
                 LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(expiresIn != null ? expiresIn : 3600);
 
-                return new TokenRefreshResult(accessToken, refreshToken, expiresAt);
+                return new TokenRefreshResult(accessToken, newRefreshToken, expiresAt);
             }
 
-            throw new RuntimeException("Empty response from token refresh");
+            throw new IllegalStateException("Empty response from Google token refresh");
 
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to refresh Google OAuth token: {}", e.getMessage());
             throw e;
@@ -303,7 +318,7 @@ public class GoogleApiClient {
                     .bodyValue(registration)
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (response != null) {
                 return (String) response.get("registrationId");
@@ -329,9 +344,14 @@ public class GoogleApiClient {
     // ========================================================================
 
     private WebClient createClient(VendorCredential credential) {
+        String token = decryptionService.decrypt(credential.getEncryptedOauthToken());
+        if (token == null || token.isBlank()) {
+            throw new IllegalStateException("OAuth token is missing for credential: " + credential.getConnectionName());
+        }
+
         return webClientBuilder
                 .baseUrl(CLASSROOM_API_BASE)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + credential.getEncryptedOauthToken())
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }

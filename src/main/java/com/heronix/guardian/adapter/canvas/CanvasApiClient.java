@@ -1,6 +1,7 @@
 package com.heronix.guardian.adapter.canvas;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -21,6 +22,7 @@ import com.heronix.guardian.model.domain.VendorCredential;
 import com.heronix.guardian.model.dto.InboundGradeDTO;
 import com.heronix.guardian.model.dto.TokenizedCourseDTO;
 import com.heronix.guardian.model.dto.TokenizedStudentDTO;
+import com.heronix.guardian.service.CredentialDecryptionService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,9 @@ public class CanvasApiClient {
 
     private final WebClient.Builder webClientBuilder;
     private final GuardianProperties properties;
+    private final CredentialDecryptionService decryptionService;
+
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     /**
      * Get account information for connection testing.
@@ -49,7 +54,7 @@ public class CanvasApiClient {
                     .uri("/api/v1/accounts/self")
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (response != null) {
                 return new AccountInfo(
@@ -92,7 +97,7 @@ public class CanvasApiClient {
                     .retrieve()
                     .bodyToMono(Map.class)
                     .onErrorReturn(Map.of())
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (existingUser != null && existingUser.containsKey("id")) {
                 // Update existing user
@@ -102,7 +107,7 @@ public class CanvasApiClient {
                         .bodyValue(userData)
                         .retrieve()
                         .bodyToMono(Void.class)
-                        .block();
+                        .block(REQUEST_TIMEOUT);
             } else {
                 // Create new user
                 log.debug("Creating new Canvas user: {}", student.getToken());
@@ -111,7 +116,7 @@ public class CanvasApiClient {
                         .bodyValue(userData)
                         .retrieve()
                         .bodyToMono(Void.class)
-                        .block();
+                        .block(REQUEST_TIMEOUT);
             }
 
         } catch (Exception e) {
@@ -142,7 +147,7 @@ public class CanvasApiClient {
                     .retrieve()
                     .bodyToMono(Map.class)
                     .onErrorReturn(Map.of())
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (existingCourse != null && existingCourse.containsKey("id")) {
                 // Update existing course
@@ -152,7 +157,7 @@ public class CanvasApiClient {
                         .bodyValue(courseData)
                         .retrieve()
                         .bodyToMono(Void.class)
-                        .block();
+                        .block(REQUEST_TIMEOUT);
             } else {
                 // Create new course
                 log.debug("Creating new Canvas course: {}", course.getToken());
@@ -161,7 +166,7 @@ public class CanvasApiClient {
                         .bodyValue(courseData)
                         .retrieve()
                         .bodyToMono(Void.class)
-                        .block();
+                        .block(REQUEST_TIMEOUT);
             }
 
         } catch (Exception e) {
@@ -196,7 +201,7 @@ public class CanvasApiClient {
                     .bodyValue(enrollmentData)
                     .retrieve()
                     .bodyToMono(Void.class)
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             log.debug("Created Canvas enrollment: {} in {}", studentToken, courseToken);
 
@@ -224,7 +229,7 @@ public class CanvasApiClient {
                     .retrieve()
                     .bodyToFlux(Map.class)
                     .collectList()
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (submissions != null) {
                 for (Map<String, Object> sub : submissions) {
@@ -260,6 +265,13 @@ public class CanvasApiClient {
      * Refresh OAuth token.
      */
     public TokenRefreshResult refreshToken(VendorCredential credential) {
+        String clientSecret = decryptionService.decrypt(credential.getEncryptedClientSecret());
+        String refreshToken = decryptionService.decrypt(credential.getEncryptedRefreshToken());
+
+        if (clientSecret == null || refreshToken == null) {
+            throw new IllegalStateException("OAuth client_secret or refresh_token is missing for credential: " + credential.getConnectionName());
+        }
+
         WebClient client = WebClient.builder()
                 .baseUrl(credential.getApiBaseUrl())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
@@ -271,25 +283,27 @@ public class CanvasApiClient {
                     .bodyValue(Map.of(
                             "grant_type", "refresh_token",
                             "client_id", credential.getClientId(),
-                            "client_secret", credential.getEncryptedClientSecret(), // Should be decrypted
-                            "refresh_token", credential.getEncryptedRefreshToken()   // Should be decrypted
+                            "client_secret", clientSecret,
+                            "refresh_token", refreshToken
                     ))
                     .retrieve()
                     .bodyToMono(Map.class)
-                    .block();
+                    .block(REQUEST_TIMEOUT);
 
             if (response != null) {
                 String accessToken = (String) response.get("access_token");
-                String refreshToken = (String) response.get("refresh_token");
+                String newRefreshToken = (String) response.get("refresh_token");
                 Integer expiresIn = (Integer) response.get("expires_in");
 
                 LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(expiresIn != null ? expiresIn : 3600);
 
-                return new TokenRefreshResult(accessToken, refreshToken, expiresAt);
+                return new TokenRefreshResult(accessToken, newRefreshToken, expiresAt);
             }
 
-            throw new RuntimeException("Empty response from token refresh");
+            throw new IllegalStateException("Empty response from Canvas token refresh");
 
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to refresh Canvas OAuth token: {}", e.getMessage());
             throw e;
@@ -333,12 +347,17 @@ public class CanvasApiClient {
     private WebClient createClient(VendorCredential credential) {
         String baseUrl = credential.getApiBaseUrl();
         if (baseUrl == null || baseUrl.isBlank()) {
-            baseUrl = "https://canvas.instructure.com";
+            throw new IllegalStateException("Canvas API base URL is not configured for credential: " + credential.getConnectionName());
+        }
+
+        String token = decryptionService.decrypt(credential.getEncryptedOauthToken());
+        if (token == null || token.isBlank()) {
+            throw new IllegalStateException("OAuth token is missing for credential: " + credential.getConnectionName());
         }
 
         return webClientBuilder
                 .baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + credential.getEncryptedOauthToken())
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }
