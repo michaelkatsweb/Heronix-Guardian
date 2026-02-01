@@ -28,7 +28,7 @@ public class GuardianSecurityConfig {
      * Development security configuration - permissive for testing.
      */
     @Bean
-    @Profile({"dev", "test", "default"})
+    @Profile({"dev", "test"})
     public SecurityFilterChain devSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
