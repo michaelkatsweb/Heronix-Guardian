@@ -1,0 +1,28 @@
+# ============================================================================
+# Heronix Guardian - H2 Fallback Profile
+# ============================================================================
+# Activate with: --spring.profiles.active=h2
+# Use when PostgreSQL is unavailable (development/offline)
+# ============================================================================
+
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/heronix-guardian;AUTO_SERVER=TRUE;MODE=LEGACY
+    driver-class-name: org.h2.Driver
+    username: ${DB_USERNAME:sa}
+    password: ${DB_PASSWORD:}
+
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+
+  flyway:
+    locations: classpath:db/migration

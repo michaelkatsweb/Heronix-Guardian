@@ -9,8 +9,8 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/heronix_guardian
     driver-class-name: org.postgresql.Driver
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    username: ${DB_USERNAME:heronix}
+    password: ${DB_PASSWORD:heronix_dev}
     hikari:
       minimum-idle: 5
       maximum-pool-size: 20
@@ -81,7 +81,7 @@ heronix:
 
     # SIS Integration (REQUIRED for v2.0)
     sis:
-      api-url: ${SIS_API_URL:http://localhost:9580}
+      api-url: ${SIS_API_URL:http://localhost:9590}
       api-key: ${SIS_SERVICE_API_KEY:}
       connection-timeout: 10
       read-timeout: 30
