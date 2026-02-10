@@ -12,6 +12,17 @@ import lombok.Data;
 public class GuardianProperties {
 
     /**
+     * Use SIS tokenization instead of local Guardian tokens.
+     * When true, SisTokenBridgeService is activated and delegates to SIS-Server.
+     */
+    private boolean useSisTokenization = false;
+
+    /**
+     * Gateway integration configuration
+     */
+    private GatewayConfig gateway = new GatewayConfig();
+
+    /**
      * Token configuration
      */
     private TokenConfig token = new TokenConfig();
@@ -178,5 +189,18 @@ public class GuardianProperties {
          * Enable detailed audit logging
          */
         private boolean detailedLogging = true;
+    }
+
+    @Data
+    public static class GatewayConfig {
+        /**
+         * Enable routing outbound data through SIS SecureOutboundProxyService
+         */
+        private boolean enabled = false;
+
+        /**
+         * Require vendors to be registered as SIS gateway devices
+         */
+        private boolean requireDeviceRegistration = true;
     }
 }

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,7 +17,6 @@ import com.heronix.guardian.model.dto.TokenizedStudentDTO;
 import com.heronix.guardian.model.enums.TokenType;
 import com.heronix.guardian.model.enums.VendorType;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -24,14 +24,26 @@ import lombok.extern.slf4j.Slf4j;
  *
  * OUTBOUND (to vendors): Real data -> Tokenized data
  * INBOUND (from vendors): Tokenized data -> Real IDs
+ *
+ * When SisTokenBridgeService is available, uses SIS for token generation
+ * and resolution. Falls back to deprecated local services otherwise.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class DataTranslationService {
 
     private final TokenMappingService tokenMappingService;
     private final TokenGenerationService tokenGenerationService;
+
+    @Autowired(required = false)
+    private SisTokenBridgeService sisTokenBridge;
+
+    public DataTranslationService(
+            TokenMappingService tokenMappingService,
+            TokenGenerationService tokenGenerationService) {
+        this.tokenMappingService = tokenMappingService;
+        this.tokenGenerationService = tokenGenerationService;
+    }
 
     // ========================================================================
     // OUTBOUND TRANSLATION (Real Data -> Tokenized)
@@ -67,19 +79,25 @@ public class DataTranslationService {
             VendorType vendor) {
 
         String vendorScope = vendor != null ? vendor.name() : null;
+        String tokenValue;
 
-        // Get or create token
-        GuardianToken token = tokenGenerationService.getOrCreateToken(
-                TokenType.STUDENT, studentId, vendorScope);
+        // Use SIS bridge when available, fall back to local
+        if (sisTokenBridge != null) {
+            tokenValue = sisTokenBridge.getOrCreateToken(studentId, vendorScope);
+        } else {
+            GuardianToken token = tokenGenerationService.getOrCreateToken(
+                    TokenType.STUDENT, studentId, vendorScope);
+            tokenValue = token.getTokenValue();
+        }
 
         // Generate display name (first name + last initial)
         String displayName = generateDisplayName(firstName, lastName);
 
         return TokenizedStudentDTO.builder()
-                .token(token.getTokenValue())
+                .token(tokenValue)
                 .displayName(displayName)
                 .gradeLevel(gradeLevel)
-                .email(token.getTokenValue().toLowerCase() + "@guardian.heronix.local")
+                .email(tokenValue.toLowerCase() + "@guardian.heronix.local")
                 .build();
     }
 
@@ -170,11 +188,18 @@ public class DataTranslationService {
     @Transactional
     public Optional<GradeUpdateDTO> translateInboundGrade(InboundGradeDTO inboundGrade, VendorType vendor) {
         try {
-            // Resolve student token
-            Long studentId = tokenMappingService.resolveToEntityId(
-                    inboundGrade.getStudentToken(), TokenType.STUDENT);
+            // Resolve student token (SIS bridge or local)
+            Long studentId;
+            if (sisTokenBridge != null) {
+                studentId = sisTokenBridge.resolveToken(inboundGrade.getStudentToken())
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "Cannot resolve student token: " + inboundGrade.getStudentToken()));
+            } else {
+                studentId = tokenMappingService.resolveToEntityId(
+                        inboundGrade.getStudentToken(), TokenType.STUDENT);
+            }
 
-            // Resolve course token
+            // Resolve course token (local only — SIS bridge handles students)
             Long courseId = tokenMappingService.resolveToEntityId(
                     inboundGrade.getCourseToken(), TokenType.COURSE);
 
