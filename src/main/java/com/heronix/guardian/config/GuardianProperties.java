@@ -114,7 +114,7 @@ public class GuardianProperties {
         /**
          * Heronix SIS API base URL
          */
-        private String apiUrl = "http://localhost:9580";
+        private String apiUrl = "http://localhost:9590";
 
         /**
          * API key for service-to-service authentication
