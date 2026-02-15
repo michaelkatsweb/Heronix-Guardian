@@ -61,12 +61,15 @@ public class GuardianSecurityConfig {
         http
             .csrf(csrf -> csrf
                 .ignoringRequestMatchers("/api/v1/guardian/webhooks/**") // Webhooks need CSRF disabled
+                .ignoringRequestMatchers("/api/v1/parent-portal/**") // Parent portal uses device auth
             )
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
                 .requestMatchers("/actuator/health").permitAll()
+                // Parent Portal gateway (device auth handled by DeviceVerificationFilter)
+                .requestMatchers("/api/v1/parent-portal/**").permitAll()
                 // Webhook endpoints (authenticated by signature)
                 .requestMatchers("/api/v1/guardian/webhooks/**").permitAll()
                 // All other API endpoints require authentication

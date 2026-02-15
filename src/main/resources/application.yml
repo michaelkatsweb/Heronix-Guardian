@@ -114,6 +114,12 @@ heronix:
       retention-days: 365
       detailed-logging: true
 
+    # Parent Portal Gateway
+    parent-portal:
+      enabled: true
+      require-device-registration: true
+      max-requests-per-minute: 60
+
 # Actuator Endpoints
 management:
   endpoints:

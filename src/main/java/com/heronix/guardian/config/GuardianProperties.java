@@ -57,6 +57,29 @@ public class GuardianProperties {
      */
     private AuditConfig audit = new AuditConfig();
 
+    /**
+     * Parent Portal gateway configuration
+     */
+    private ParentPortalConfig parentPortal = new ParentPortalConfig();
+
+    @Data
+    public static class ParentPortalConfig {
+        /**
+         * Enable parent portal gateway
+         */
+        private boolean enabled = true;
+
+        /**
+         * Require device registration for parent portal access
+         */
+        private boolean requireDeviceRegistration = true;
+
+        /**
+         * Maximum requests per minute per device (rate limiting)
+         */
+        private int maxRequestsPerMinute = 60;
+    }
+
     @Data
     public static class TokenConfig {
         /**
