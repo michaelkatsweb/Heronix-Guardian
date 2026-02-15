@@ -2,6 +2,7 @@ package com.heronix.guardian;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import com.heronix.guardian.security.HeronixEncryptionService;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -24,6 +25,7 @@ import com.heronix.guardian.config.GuardianProperties;
 public class GuardianApplication {
 
     public static void main(String[] args) {
+        HeronixEncryptionService.initialize();
         SpringApplication.run(GuardianApplication.class, args);
     }
 }

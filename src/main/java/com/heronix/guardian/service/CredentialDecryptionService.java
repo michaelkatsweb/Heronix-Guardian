@@ -37,19 +37,44 @@ public class CredentialDecryptionService {
 
     @PostConstruct
     void init() {
+        // Prefer unified HERONIX_MASTER_KEY; fall back to legacy GUARDIAN_MASTER_KEY
+        com.heronix.guardian.security.HeronixEncryptionService enc =
+            com.heronix.guardian.security.HeronixEncryptionService.getInstance();
+
+        if (!enc.isDisabled()) {
+            // Derive credential key from the unified Heronix master key via PBKDF2
+            try {
+                String masterPassphrase = System.getenv("HERONIX_MASTER_KEY");
+                if (masterPassphrase != null && !masterPassphrase.isBlank()) {
+                    javax.crypto.SecretKeyFactory factory =
+                        javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+                    java.security.spec.KeySpec spec = new javax.crypto.spec.PBEKeySpec(
+                        masterPassphrase.toCharArray(),
+                        "HeronixGuardian-Cred-Salt".getBytes(StandardCharsets.UTF_8),
+                        100_000, 256);
+                    byte[] derived = factory.generateSecret(spec).getEncoded();
+                    this.secretKey = new SecretKeySpec(derived, "AES");
+                    log.info("Credential encryption service initialized from HERONIX_MASTER_KEY");
+                    return;
+                }
+            } catch (Exception e) {
+                log.warn("Failed to derive credential key from HERONIX_MASTER_KEY, falling back", e);
+            }
+        }
+
+        // Legacy fallback: use GUARDIAN_MASTER_KEY from properties
         String masterKey = properties.getEncryption().getMasterKey();
         if (masterKey == null || masterKey.isBlank()) {
-            log.error("GUARDIAN_MASTER_KEY is not set! Credential encryption/decryption will fail.");
+            log.error("Neither HERONIX_MASTER_KEY nor GUARDIAN_MASTER_KEY is set! Credential encryption/decryption will fail.");
             return;
         }
 
-        // Derive a 256-bit key from the master key string
         byte[] keyBytes = new byte[32];
         byte[] rawBytes = masterKey.getBytes(StandardCharsets.UTF_8);
         System.arraycopy(rawBytes, 0, keyBytes, 0, Math.min(rawBytes.length, 32));
         this.secretKey = new SecretKeySpec(keyBytes, "AES");
 
-        log.info("Credential encryption service initialized");
+        log.info("Credential encryption service initialized from GUARDIAN_MASTER_KEY (legacy)");
     }
 
     /**
