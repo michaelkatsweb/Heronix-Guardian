@@ -64,7 +64,7 @@ public class ParentPortalDeviceVerificationService {
         String cacheKey = deviceId + ":" + publicKeyHash;
         CachedVerification cached = verificationCache.get(cacheKey);
         if (cached != null && !cached.isExpired()) {
-            log.debug("PARENT_PORTAL_VERIFY: Cache hit for device {}", deviceId.substring(0, 8));
+            log.debug("PARENT_PORTAL_VERIFY: Cache hit for device {}", deviceId.substring(0, Math.min(8, deviceId.length())));
             return cached.verified;
         }
 
@@ -83,7 +83,7 @@ public class ParentPortalDeviceVerificationService {
                     .block(REQUEST_TIMEOUT);
 
             if (response == null) {
-                log.warn("PARENT_PORTAL_VERIFY: Empty response from SIS for device {}", deviceId.substring(0, 8));
+                log.warn("PARENT_PORTAL_VERIFY: Empty response from SIS for device {}", deviceId.substring(0, Math.min(8, deviceId.length())));
                 return false;
             }
 
@@ -93,18 +93,18 @@ public class ParentPortalDeviceVerificationService {
             verificationCache.put(cacheKey, new CachedVerification(verified, System.currentTimeMillis()));
 
             if (verified) {
-                log.debug("PARENT_PORTAL_VERIFY: Device {} verified", deviceId.substring(0, 8));
+                log.debug("PARENT_PORTAL_VERIFY: Device {} verified", deviceId.substring(0, Math.min(8, deviceId.length())));
             } else {
                 String reason = (String) response.get("reason");
                 log.warn("PARENT_PORTAL_VERIFY: Device {} verification failed: {}",
-                        deviceId.substring(0, 8), reason);
+                        deviceId.substring(0, Math.min(8, deviceId.length())), reason);
             }
 
             return verified;
 
         } catch (Exception e) {
             log.error("PARENT_PORTAL_VERIFY: SIS verification call failed for device {}: {}",
-                    deviceId.substring(0, 8), e.getMessage());
+                    deviceId.substring(0, Math.min(8, deviceId.length())), e.getMessage());
             return false;
         }
     }

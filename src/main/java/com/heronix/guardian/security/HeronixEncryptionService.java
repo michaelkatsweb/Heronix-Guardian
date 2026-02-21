@@ -10,8 +10,8 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.security.spec.KeySpec;
 import java.util.Base64;
+import java.util.logging.Logger;
 
 /**
  * Heronix Unified Encryption Service — singleton utility (not Spring-managed).
@@ -23,6 +23,8 @@ import java.util.Base64;
  * @since 2026-02
  */
 public final class HeronixEncryptionService {
+
+    private static final Logger logger = Logger.getLogger(HeronixEncryptionService.class.getName());
 
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_IV_LENGTH = 12;
@@ -39,7 +41,7 @@ public final class HeronixEncryptionService {
     private static final String ENV_MASTER_KEY = "HERONIX_MASTER_KEY";
     private static final String ENV_DISABLED = "HERONIX_ENCRYPTION_DISABLED";
 
-    private static HeronixEncryptionService INSTANCE;
+    private static volatile HeronixEncryptionService INSTANCE;
 
     private final SecretKey dataKey;
     private final String h2FilePassword;
@@ -69,7 +71,7 @@ public final class HeronixEncryptionService {
         String disabled = System.getenv(ENV_DISABLED);
         if ("true".equalsIgnoreCase(disabled)) {
             INSTANCE = new HeronixEncryptionService(true);
-            System.out.println("[HeronixEncryption] WARNING: Encryption is DISABLED (dev mode).");
+            logger.warning("[HeronixEncryption] Encryption is DISABLED (dev mode).");
             return;
         }
 
@@ -91,7 +93,7 @@ public final class HeronixEncryptionService {
         }
 
         INSTANCE = new HeronixEncryptionService(passphrase);
-        System.out.println("[HeronixEncryption] Encryption initialized successfully.");
+        logger.info("[HeronixEncryption] Encryption initialized successfully.");
     }
 
     public static synchronized void initialize(String passphrase) {
@@ -136,6 +138,9 @@ public final class HeronixEncryptionService {
 
     public byte[] decrypt(byte[] data) {
         if (disabled) return data;
+        if (data == null || data.length < GCM_IV_LENGTH) {
+            throw new IllegalArgumentException("Ciphertext is null or too short to contain IV");
+        }
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
             System.arraycopy(data, 0, iv, 0, GCM_IV_LENGTH);
@@ -152,12 +157,14 @@ public final class HeronixEncryptionService {
     }
 
     public String encryptToBase64(String plaintext) {
+        if (plaintext == null) return null;
         if (disabled) return plaintext;
         byte[] encrypted = encrypt(plaintext.getBytes(StandardCharsets.UTF_8));
         return Base64.getEncoder().encodeToString(encrypted);
     }
 
     public String decryptFromBase64(String base64Ciphertext) {
+        if (base64Ciphertext == null) return null;
         if (disabled) return base64Ciphertext;
         byte[] encrypted = Base64.getDecoder().decode(base64Ciphertext);
         byte[] decrypted = decrypt(encrypted);
@@ -247,13 +254,18 @@ public final class HeronixEncryptionService {
     }
 
     private static SecretKey deriveKey(String passphrase, byte[] salt, int keyLengthBits) {
+        PBEKeySpec spec = null;
         try {
-            KeySpec spec = new PBEKeySpec(passphrase.toCharArray(), salt, PBKDF2_ITERATIONS, keyLengthBits);
+            spec = new PBEKeySpec(passphrase.toCharArray(), salt, PBKDF2_ITERATIONS, keyLengthBits);
             SecretKeyFactory factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM);
             byte[] keyBytes = factory.generateSecret(spec).getEncoded();
             return new SecretKeySpec(keyBytes, "AES");
         } catch (Exception e) {
             throw new RuntimeException("Key derivation failed", e);
+        } finally {
+            if (spec != null) {
+                spec.clearPassword();
+            }
         }
     }
 

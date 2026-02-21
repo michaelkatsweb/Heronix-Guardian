@@ -57,7 +57,7 @@ public class ParentPortalGatewayController {
         String deviceId = (String) request.get("deviceId");
         String parentEmail = (String) request.get("parentEmail");
         log.info("PARENT_PORTAL_GW: Device registration request from {} ({})",
-                parentEmail, deviceId != null ? deviceId.substring(0, 8) : "null");
+                parentEmail, deviceId != null ? deviceId.substring(0, Math.min(8, deviceId.length())) : "null");
 
         try {
             // Forward registration to SIS
@@ -89,7 +89,7 @@ public class ParentPortalGatewayController {
         String publicKeyHash = (String) request.get("publicKeyHash");
 
         log.debug("PARENT_PORTAL_GW: Status check for device {}",
-                deviceId != null ? deviceId.substring(0, 8) : "null");
+                deviceId != null ? deviceId.substring(0, Math.min(8, deviceId.length())) : "null");
 
         try {
             Map<String, Object> sisResponse = callSis(
