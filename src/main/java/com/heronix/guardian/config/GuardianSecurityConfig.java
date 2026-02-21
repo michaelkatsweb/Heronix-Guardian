@@ -3,6 +3,8 @@ package com.heronix.guardian.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -10,6 +12,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
+
+import com.heronix.guardian.security.DeviceVerificationFilter;
+
+import lombok.RequiredArgsConstructor;
 
 /**
  * Security configuration for Heronix Guardian.
@@ -17,7 +24,10 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
+@RequiredArgsConstructor
 public class GuardianSecurityConfig {
+
+    private final DeviceVerificationFilter deviceVerificationFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -25,10 +35,11 @@ public class GuardianSecurityConfig {
     }
 
     /**
-     * Development security configuration - permissive for testing.
+     * Default/development security configuration - permissive for testing.
+     * Active when no specific profile (like "prod") is active.
      */
     @Bean
-    @Profile({"dev", "test"})
+    @Order(Ordered.LOWEST_PRECEDENCE)
     public SecurityFilterChain devSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
@@ -57,6 +68,7 @@ public class GuardianSecurityConfig {
      */
     @Bean
     @Profile("prod")
+    @Order(Ordered.HIGHEST_PRECEDENCE)
     public SecurityFilterChain prodSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf
@@ -76,6 +88,7 @@ public class GuardianSecurityConfig {
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().denyAll()
             )
+            .addFilterBefore(deviceVerificationFilter, AuthorizationFilter.class)
             .headers(headers -> headers
                 .contentSecurityPolicy(csp ->
                     csp.policyDirectives("default-src 'self'; frame-ancestors 'none';"))

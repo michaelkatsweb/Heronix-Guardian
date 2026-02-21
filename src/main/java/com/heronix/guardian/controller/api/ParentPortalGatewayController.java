@@ -199,7 +199,7 @@ public class ParentPortalGatewayController {
         String sisBaseUrl = properties.getSis().getApiUrl();
         String apiKey = properties.getSis().getApiKey();
 
-        WebClient.Builder builder = webClientBuilder.baseUrl(sisBaseUrl);
+        WebClient.Builder builder = webClientBuilder.clone().baseUrl(sisBaseUrl);
 
         if (apiKey != null && !apiKey.isBlank()) {
             builder.defaultHeader("X-API-Key", apiKey);

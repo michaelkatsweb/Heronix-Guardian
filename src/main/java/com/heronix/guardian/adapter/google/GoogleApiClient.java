@@ -11,6 +11,8 @@ import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.heronix.guardian.config.GuardianProperties;
@@ -264,17 +266,18 @@ public class GoogleApiClient {
         }
 
         try {
+            LinkedMultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+            formData.add("grant_type", "refresh_token");
+            formData.add("client_id", credential.getClientId());
+            formData.add("client_secret", clientSecret);
+            formData.add("refresh_token", refreshToken);
+
             Map<String, Object> response = WebClient.builder()
                     .baseUrl(OAUTH_TOKEN_URL)
                     .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
                     .build()
                     .post()
-                    .bodyValue(Map.of(
-                            "grant_type", "refresh_token",
-                            "client_id", credential.getClientId(),
-                            "client_secret", clientSecret,
-                            "refresh_token", refreshToken
-                    ))
+                    .body(BodyInserters.fromFormData(formData))
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block(REQUEST_TIMEOUT);

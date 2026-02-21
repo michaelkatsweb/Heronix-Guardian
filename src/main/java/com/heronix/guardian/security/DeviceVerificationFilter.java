@@ -83,7 +83,7 @@ public class DeviceVerificationFilter extends OncePerRequestFilter {
             return;
         }
 
-        log.debug("DEVICE_FILTER: Device {} verified for {}", deviceId.substring(0, 8), request.getRequestURI());
+        log.debug("DEVICE_FILTER: Device {} verified for {}", deviceId.substring(0, Math.min(8, deviceId.length())), request.getRequestURI());
         filterChain.doFilter(request, response);
     }
 }

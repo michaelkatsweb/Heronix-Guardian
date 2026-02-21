@@ -67,6 +67,13 @@ public class AccessVerificationController {
 
         log.info("Verifying parent-student access: parent={}, student={}", parentId, studentId);
 
+        // Validate IDs are numeric to prevent path traversal / SSRF
+        if (!parentId.matches("^\\d+$") || !studentId.matches("^\\d+$")) {
+            log.warn("Invalid ID format: parent={}, student={}", parentId, studentId);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("verified", false, "error", "Invalid parentId or studentId format"));
+        }
+
         try {
             String sisUrl = guardianProperties.getSis().getApiUrl()
                     + "/api/parent-guardian/" + parentId + "/verify-student/" + studentId;

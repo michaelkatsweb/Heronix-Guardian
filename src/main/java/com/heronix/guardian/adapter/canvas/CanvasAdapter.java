@@ -11,6 +11,7 @@ import com.heronix.guardian.model.dto.InboundGradeDTO;
 import com.heronix.guardian.model.dto.TokenizedCourseDTO;
 import com.heronix.guardian.model.dto.TokenizedStudentDTO;
 import com.heronix.guardian.model.enums.VendorType;
+import com.heronix.guardian.service.CredentialDecryptionService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 public class CanvasAdapter implements VendorAdapter {
 
     private final CanvasApiClient apiClient;
+    private final CredentialDecryptionService decryptionService;
 
     @Override
     public VendorType getVendorType() {
@@ -74,9 +76,9 @@ public class CanvasAdapter implements VendorAdapter {
         try {
             var newTokens = apiClient.refreshToken(credential);
 
-            credential.setEncryptedOauthToken(newTokens.accessToken());
+            credential.setEncryptedOauthToken(decryptionService.encrypt(newTokens.accessToken()));
             if (newTokens.refreshToken() != null) {
-                credential.setEncryptedRefreshToken(newTokens.refreshToken());
+                credential.setEncryptedRefreshToken(decryptionService.encrypt(newTokens.refreshToken()));
             }
             credential.setOauthExpiresAt(newTokens.expiresAt());
 

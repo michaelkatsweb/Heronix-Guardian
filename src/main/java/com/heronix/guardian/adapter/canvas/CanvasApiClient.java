@@ -15,6 +15,8 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.heronix.guardian.config.GuardianProperties;
@@ -278,14 +280,15 @@ public class CanvasApiClient {
                 .build();
 
         try {
+            LinkedMultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+            formData.add("grant_type", "refresh_token");
+            formData.add("client_id", credential.getClientId());
+            formData.add("client_secret", clientSecret);
+            formData.add("refresh_token", refreshToken);
+
             Map<String, Object> response = client.post()
                     .uri("/login/oauth2/token")
-                    .bodyValue(Map.of(
-                            "grant_type", "refresh_token",
-                            "client_id", credential.getClientId(),
-                            "client_secret", clientSecret,
-                            "refresh_token", refreshToken
-                    ))
+                    .body(BodyInserters.fromFormData(formData))
                     .retrieve()
                     .bodyToMono(Map.class)
                     .block(REQUEST_TIMEOUT);
