@@ -48,14 +48,19 @@ public class CredentialDecryptionService {
                 if (masterPassphrase != null && !masterPassphrase.isBlank()) {
                     javax.crypto.SecretKeyFactory factory =
                         javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-                    java.security.spec.KeySpec spec = new javax.crypto.spec.PBEKeySpec(
-                        masterPassphrase.toCharArray(),
-                        "HeronixGuardian-Cred-Salt".getBytes(StandardCharsets.UTF_8),
-                        100_000, 256);
-                    byte[] derived = factory.generateSecret(spec).getEncoded();
-                    this.secretKey = new SecretKeySpec(derived, "AES");
-                    log.info("Credential encryption service initialized from HERONIX_MASTER_KEY");
-                    return;
+                    javax.crypto.spec.PBEKeySpec spec = null;
+                    try {
+                        spec = new javax.crypto.spec.PBEKeySpec(
+                            masterPassphrase.toCharArray(),
+                            "HeronixGuardian-Cred-Salt".getBytes(StandardCharsets.UTF_8),
+                            100_000, 256);
+                        byte[] derived = factory.generateSecret(spec).getEncoded();
+                        this.secretKey = new SecretKeySpec(derived, "AES");
+                        log.info("Credential encryption service initialized from HERONIX_MASTER_KEY");
+                        return;
+                    } finally {
+                        if (spec != null) spec.clearPassword();
+                    }
                 }
             } catch (Exception e) {
                 log.warn("Failed to derive credential key from HERONIX_MASTER_KEY, falling back", e);
